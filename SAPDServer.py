@@ -8,6 +8,19 @@ import freshroastsr700
 import logging
 import Pyro4
 
+import serial
+import re
+from serial.tools import list_ports
+
+def find_device(vidpid):
+    """Finds a connected device with the given VID:PID. Returns the serial
+    port url."""
+    for port in list_ports.comports():
+        if re.search(vidpid, port[2], flags=re.IGNORECASE):
+            return port[0]
+
+    raise FileNotFoundError("couldn't find Arduino")
+
 
 @Pyro4.expose
 class Roaster(object):
@@ -16,6 +29,16 @@ class Roaster(object):
         class."""
         self.roaster = freshroastsr700.freshroastsr700(
             self.update_data, self.next_state, thermostat=True)
+        port = find_device('10C4:EA60')
+        self.ser = serial.Serial(port=port,
+                      baudrate=115200,
+                      bytesize=8,
+                      parity='N',
+                      stopbits=1,
+                      timeout=1,
+                      xonxoff=False,
+                      dsrdtr=False)
+
 
     def update_data(self):
         """This is a method that will be called every time a packet is opened
@@ -52,10 +75,21 @@ class Roaster(object):
         new_time = int(time)
         self.roaster.time_remaining = new_time
 
+    def get_temp(self):
+        self.ser.write(b' ')
+        resp = b''
+        c = None
+        while c != b'\n':
+            c = self.ser.read(1)
+            # print("c {} len(c) {}".format(c,len(c)))
+            resp = resp + c
+        return resp.strip().decode()[:-1]
+
     def output_current_state(self):
         cur_state = self.roaster.get_roaster_state()
+        BT_temp = self.get_temp()
         cur_temp = str(self.roaster.current_temp)
-        ret_state = cur_temp + cur_state
+        ret_state = cur_temp + "," + BT_temp + "," + cur_state
         return ret_state
 
 

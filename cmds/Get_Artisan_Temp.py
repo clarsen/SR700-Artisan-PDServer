@@ -6,4 +6,6 @@
 import Pyro4
 
 roast_control = Pyro4.Proxy("PYRONAME:roaster.sr700")
-print (roast_control.output_current_state()[0:3])
+s = roast_control.output_current_state()
+print(','.join(s.split(',')[0:2]))
+# print ("{},0.0".format(roast_control.output_current_state()[0:3]))
